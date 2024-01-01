@@ -15,8 +15,8 @@ app.post('/api', async (req, res) => {
     res.send(response)
 })
 
-app.listen(3000, () => {
-    console.log('server started on http://localhost:3000')
+app.listen(3010, () => {
+    console.log('server started on http://localhost:3010')
 })
 
 
