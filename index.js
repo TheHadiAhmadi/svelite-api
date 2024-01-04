@@ -10,7 +10,7 @@ app.use(express.json())
 
 app.post('/api', async (req, res) => {
     console.log('req')
-    const response = await server({body: req.body})
+    const response = await server({headers: req.headers, body: req.body})
 
     res.send(response)
 })
