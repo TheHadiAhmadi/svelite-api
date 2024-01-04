@@ -87,7 +87,7 @@ function respond(code = 200, data = null, message = 'Success', field = null) {
 }
 
 export default function createSveliteServer(config) {
-    const dbAdapter = JSONAdapter("./my-data.json")
+    const dbAdapter = JSONAdapter("./data.json")
     const db = createSveliteDb(dbAdapter)
 
 	return async ({headers, body}) => {
