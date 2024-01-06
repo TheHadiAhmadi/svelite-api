@@ -15,23 +15,37 @@ async function register(body, db) {
         throw new Error('400:name: this field is required!')
     }
 
-    const user = {
+    const payload = {
         username: body.username,
         name: body.name,
         email: body.email,
         password: bcrypt.hashSync(body.password, 10),
     };
 
-    console.log("Insert", user)
-    const result = await db("users").insert(user);
+    const user = await db("users").insert(payload);
 
-    return result
+    return {
+        user,
+        token: createToken(user)
+    }
+}
+
+function createToken(user) {
+    return jwt.sign(
+        {
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            username: user.username,
+          },
+        },
+        process.env.JWT_SECRET ?? 'svelite'
+    )
 }
 
 async function login(username, password, db) {
     const user = await db("users").find().filter('username', '=', username).first();
-
-    console.log(user)
   
     if (!user) {
         console.log('throwing')
@@ -44,21 +58,9 @@ async function login(username, password, db) {
         throw new Error("401:password: Invalid password");
     }
 
-    let token = jwt.sign(
-    {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        username: user.username,
-      },
-    },
-    process.env.SECRET_KEY ?? "svelite"
-    );
-
     return {
         user,
-        token,
+        token: createToken(user),
     };
 }
 
@@ -67,7 +69,11 @@ async function getUser(db, token) {
 
         const object = jwt.verify(token, process.env.SECRET_KEY ?? 'svelite')
 
-        return await db('users').find().filter('username', '=', object.user.username).first()
+        const result = await db('users').find().filter('username', '=', object.user.username).first()
+
+        delete result['password']
+
+        return result
 
     } catch(err) {
         throw new Error('401::JWT ' + err.message)
@@ -101,103 +107,81 @@ export default function createSveliteServer(config) {
         let message = 'success';
         let field = null;
 
-        switch (action) {
-            case 'insert':
-                const insertedData = await collection.insert(data);
-                result = insertedData;
-                message = 'Data Inserted successfully';
+        try {
+            const token = (headers['authorization'] ?? '').split(' ')[1]
 
-                break;
+            switch (action) {
+                case 'insert':
+                    const insertedData = await collection.insert(data);
+                    result = insertedData;
+                    message = 'Data Inserted successfully';
 
-            case 'update':
-                // Assuming you have a specific identifier for the update (e.g., data.id)
-                await collection.update((value) => value.id === data.id, data);
-                message = 'Data updated successfully';
-                result = {}
-                break;
+                    break;
 
-            case 'remove':
-                // Assuming data is the ID to be removed
-                await collection.remove(data);
-                message = 'Data removed successfully';
-                break;
+                case 'update':
+                    // Assuming you have a specific identifier for the update (e.g., data.id)
+                    await collection.update((value) => value.id === data.id, data);
+                    message = 'Data updated successfully';
+                    result = {}
+                    break;
 
-            case 'find':
-                const { filters = [], perPage, page } = body;
-                // Assuming filters is an array of filter items
-                let query = collection.find();
+                case 'remove':
+                    // Assuming data is the ID to be removed
+                    await collection.remove(data);
+                    message = 'Data removed successfully';
+                    break;
 
-                filters.map((filter) => {
-                    query = query.filter(filter.field, filter.operator, filter.value);
-                });
+                case 'find':
+                    const { filters = [], perPage, page } = body;
+                    // Assuming filters is an array of filter items
+                    let query = collection.find();
 
-                if (perPage) {
-                    result = await query.paginate(page, perPage);
-                } else {
-                    result = await query.all();
-                }
+                    filters.map((filter) => {
+                        query = query.filter(filter.field, filter.operator, filter.value);
+                    });
 
-                break;
-
-            case 'login': 
-                const {username, password} = body
-
-                try {
-                    const res = await login(username, password, db)
-                    console.log(res)
-                    result = {user: res.user, token: res.token}
-                } catch(err) {
-                    const res = err.message.split(':')
-
-                    message = res[2].trim()
-                    code = +res[0]
-                    field = res[1]
-                }
-
-                break;
-
-            case 'register': {
-                const {username, password, name, email} = body
-
-                try {
-                    const res = await register({username, password, name, email}, db)
-
-                    result = {
-                        user: res, 
-                        token: 'Please Login'
+                    if (perPage) {
+                        result = await query.paginate(page, perPage);
+                    } else {
+                        result = await query.all();
                     }
-                } catch(err) {
-                    const res = err.message.split(':')
-                    console.log(err.message)
 
-                    message = res[2].trim()
-                    code = +res[0]
-                    field = res[1]
+                    break;
+
+                case 'login': 
+                    const {username, password} = body
+
+                    result = await login(username, password, db)
+
+                    break;
+
+                case 'register': {
+                    const {username, password, name, email} = body
+
+                    result = await register({username, password, name, email}, db)
+
+                    break;
                 }
 
-                break;
-            }
+                case 'get_user': {
+                    // read token from authorization
+                        console.log(token, headers)
+                        result = await getUser(db, token)
 
-            case 'get_user': {
-                // read token from authorization
-                try {
-                    const token = (headers['authorization'] ?? '').split(' ')[1]
-                    console.log(token, headers)
-                    result = await getUser(db, token)
-                } catch(err) {
-                    const res = err.message.split(':')
-                    console.log(err.message)
+                    break;
 
-                    message = res[2].trim()
-                    code = +res[0]
                 }
 
-                break;
-
+                default:
+                    message = 'action is not defined';
             }
+        } catch(err) {
+            const res = err.message.split(':')
+            console.log(err.message)
 
-            default:
-                message = 'action is not defined';
+            message = res[2].trim()
+            code = +res[0]
+            field = res[1]
         }
 
         return respond(code, result, message, field);

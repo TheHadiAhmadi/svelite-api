@@ -97,7 +97,7 @@ export default function createSveliteDb(adapter) {
 				return { filter, all, first, paginate };
 			},
 			async insert(data) {
-				data.id = 'id_' + Math.random();
+				data.id ??= 'id_' + Math.random();
 
 				write(collectionName, [...(await read(collectionName)), data]);
 				return data;
@@ -130,7 +130,7 @@ export default function createSveliteDb(adapter) {
 export const JSONAdapter = (filename) => {
 	async function read(collection) {
 		if (!existsSync(filename)) {
-            await writeFile(filename, '{}');
+            writeFileSync(filename, '{}');
         }
 		console.log('Read from Adapter');
 		const data = JSON.parse((readFileSync(filename, 'utf-8')) || '{}');
