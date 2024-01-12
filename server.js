@@ -1,6 +1,9 @@
-import createSveliteDb, {JSONAdapter} from './db.js';
+import createSveliteDb, {createAdapter} from './db.js';
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
+
+const dbAdapter = createAdapter("./data.json")
+export const db = createSveliteDb(dbAdapter)
 
 async function register(body, db) {
     console.log("register", body)
@@ -93,8 +96,6 @@ function respond(code = 200, data = null, message = 'Success', field = null) {
 }
 
 export default function createSveliteServer(config) {
-    const dbAdapter = JSONAdapter("./data.json")
-    const db = createSveliteDb(dbAdapter)
 
 	return async ({headers, body}) => {
 

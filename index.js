@@ -3,11 +3,12 @@ import cors from 'cors'
 import path from 'path'
 import multer from 'multer'
 import createSveliteServer from './server.js'
-import createSveliteDb, {JSONAdapter} from './db.js';
+import {db} from './server.js'
 
 const server = createSveliteServer({});
 
 const app = express()
+
 app.use(cors())
 app.use(express.json())
 
@@ -31,8 +32,6 @@ app.post(
   fileMiddleware,
   // auth,
   async (req, res) => {
-    const dbAdapter = JSONAdapter("./data.json")
-    const db = createSveliteDb(dbAdapter)
       
     const id = (req.file.path.split("/").pop()).split('\\').pop();
 
